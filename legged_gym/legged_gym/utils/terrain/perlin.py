@@ -65,7 +65,7 @@ class TerrainPerlin:
         shape = (xSamples, ySamples)
         noise = np.zeros(shape)
         for _ in range(fractalOctaves):
-            noise += amplitude * TerrainPerlin.generate_perlin_noise_2d((xSamples, ySamples), (xScale, yScale)) * zScale
+            # noise += amplitude * TerrainPerlin.generate_perlin_noise_2d((xSamples, ySamples), (xScale, yScale)) * zScale
             amplitude *= fractalGain
             xScale, yScale = int(fractalLacunarity * xScale), int(fractalLacunarity * yScale)
 
