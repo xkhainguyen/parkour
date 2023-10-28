@@ -65,6 +65,12 @@ class BarrierTrack:
         "climb": 3,
         "leap": 4,
      } # track_id are aranged in this order
+    # track_options_id_dict = {
+    #     # "tilt": 1,
+    #     # "crawl": 2,
+    #     "climb": 3,
+    #     # "leap": 4,
+    #  } # track_id are aranged in this order
     def __init__(self, cfg, num_robots: int) -> None:
         self.cfg = cfg
         self.num_robots = num_robots
@@ -477,6 +483,7 @@ class BarrierTrack:
                 replace= True,
             )
         else:
+            # import pdb; pdb.set_trace()
             obstacle_order = np.arange(len(self.track_kwargs["options"]))
         difficulties = self.get_difficulty(row_idx, col_idx)
         difficulty, virtual_track = difficulties[:2]
@@ -541,8 +548,9 @@ class BarrierTrack:
         block_starting_height_px += height_offset_px
         
         for obstacle_idx, obstacle_selection in enumerate(obstacle_order):
-            obstacle_name = self.track_kwargs["options"][obstacle_selection]
-            obstacle_id = self.track_options_id_dict[obstacle_name]
+            obstacle_name = self.track_kwargs["options"][obstacle_selection]  # get name from number generator (based on length of self.track_kwargs["options"]) 
+            obstacle_id = self.track_options_id_dict[obstacle_name]  # get id from name
+            # import pdb; pdb.set_trace()
             # call method to generate trimesh and heightfield for each track block.
             # For example get_climb_track, get_tilt_track
             # using `virtual_track` to create non-collision mesh for collocation method in training.

@@ -67,15 +67,22 @@ class A1FieldDistillCfg( A1FieldCfg ):
         
         selected = "BarrierTrack"
         BarrierTrack_kwargs = dict(
+            # options= [
+            #     "tilt",
+            #     "crawl",
+            #     "climb",
+            #     "climb",
+            #     "leap",
+            # ], # each race track will permute all the options
             options= [
-                "tilt",
-                "crawl",
                 "climb",
                 "climb",
-                "leap",
+                "climb",
+                "climb",
+                "climb",
             ], # each race track will permute all the options
             n_obstacles_per_track= 5,
-            randomize_obstacle_order= True,
+            randomize_obstacle_order= False, # khai: we don't need to randomize 
             track_width= 3.0,
             track_block_length= 1.8, # the x-axis distance from the env origin point
             wall_thickness= (0.2, 1.), # [m]
@@ -85,7 +92,7 @@ class A1FieldDistillCfg( A1FieldCfg ):
                 # height= (0.1, 0.5),
                 depth= (0.1, 0.2), # size along the forward axis
                 fake_offset= 0.0, # [m] making the climb's height info greater than its physical height.
-                climb_down_prob= 0.5,
+                climb_down_prob= 0,
             ),
             crawl= dict(
                 # height= (0.28, 0.4),
@@ -232,7 +239,9 @@ class A1FieldDistillCfgPPO( A1FieldCfgPPO ):
         learning_rate = 3e-4
         optimizer_class_name = "AdamW"
 
-        teacher_policy_class_name = "ActorCriticClimbMutex"
+        # teacher_policy_class_name = "ActorCriticClimbMutex"
+        teacher_policy_class_name = "ActorCriticFieldMutex"
+
         teacher_ac_path = None
         class teacher_policy (A1FieldCfgPPO.policy ):
             # For loading teacher policy. No need to change for training student
@@ -249,22 +258,36 @@ class A1FieldDistillCfgPPO( A1FieldCfgPPO ):
             env_action_scale = A1FieldCfg.control.action_scale
 
             sub_policy_class_name = "ActorCriticRecurrent"
+            # sub_policy_paths = [ # must in the order of obstacle ID, Replace the folder name with your own training logdir
+            #     os.path.join(logs_root, "field_a1/{your walking policy}"),
+            #     os.path.join(logs_root, "field_a1/{your tilting policy}"),
+            #     os.path.join(logs_root, "field_a1/{your crawling policy}"),
+            #     os.path.join(logs_root, "field_a1/{your climbing policy}"),
+            #     os.path.join(logs_root, "field_a1/{your leaping policy}"),
+            # ]
             sub_policy_paths = [ # must in the order of obstacle ID, Replace the folder name with your own training logdir
-                os.path.join(logs_root, "field_a1/{your walking policy}"),
-                os.path.join(logs_root, "field_a1/{your tilting policy}"),
-                os.path.join(logs_root, "field_a1/{your crawling policy}"),
-                os.path.join(logs_root, "field_a1/{your climbing policy}"),
-                os.path.join(logs_root, "field_a1/{your leaping policy}"),
+                os.path.join(logs_root, "field_a1/Oct08_10-32-07_Skillclimb_pDofLimit-1e-01_climbHeight0.1-0.5_propDelay0.04-0.05_trackBlockLen1.6"),
+                os.path.join(logs_root, "field_a1/Oct08_10-32-07_Skillclimb_pDofLimit-1e-01_climbHeight0.1-0.5_propDelay0.04-0.05_trackBlockLen1.6"),
+                os.path.join(logs_root, "field_a1/Oct08_10-32-07_Skillclimb_pDofLimit-1e-01_climbHeight0.1-0.5_propDelay0.04-0.05_trackBlockLen1.6"),
+                os.path.join(logs_root, "field_a1/Oct08_10-32-07_Skillclimb_pDofLimit-1e-01_climbHeight0.1-0.5_propDelay0.04-0.05_trackBlockLen1.6"),
+                os.path.join(logs_root, "field_a1/Oct08_10-32-07_Skillclimb_pDofLimit-1e-01_climbHeight0.1-0.5_propDelay0.04-0.05_trackBlockLen1.6"),
             ]
-            climb_down_policy_path = os.path.join(logs_root, "field_a1/{your climbing down policy}")
+            # climb_down_policy_path = os.path.join(logs_root, "field_a1/{your climbing down policy}")
             cmd_vel_mapping = {
                 0: 1.0,
                 1: 0.5,
                 2: 0.8,
                 3: 1.2,
                 4: 1.5,
-            }
-    
+            } # size must equal to sub_policy_paths
+            # cmd_vel_mapping = {
+            #     0: 1.2,
+            #     1: 1.2,
+            #     2: 1.2,
+            #     3: 1.2,
+            #     4: 1.2,
+            # } # size must equal to 
+
     class policy( A1FieldCfgPPO.policy ):
         class visual_kwargs:
             channels = [16, 32, 32]
@@ -276,7 +299,8 @@ class A1FieldDistillCfgPPO( A1FieldCfgPPO ):
         visual_latent_size = 128
         init_noise_std = 0.05
 
-    runner_class_name = "TwoStageRunner"
+    # runner_class_name = "TwoStageRunner"
+    runner_class_name = "OnPolicyRunner"
     class runner( A1FieldCfgPPO.runner ):
         policy_class_name = "VisualDeterministicRecurrent"
         algorithm_class_name = "TPPO"
@@ -284,31 +308,31 @@ class A1FieldDistillCfgPPO( A1FieldCfgPPO ):
         num_steps_per_env = 48
 
         # configs for training using collected dataset
-        pretrain_iterations = -1 # negative value for infinite training
-        class pretrain_dataset:
-            scan_dir = "".join([
-                "logs/distill_a1_dagger/", datetime.now().strftime('%b%d_%H-%M-%S'), "_",
-                "".join(A1FieldDistillCfg.terrain.BarrierTrack_kwargs["options"]),
-                "_vDelay{:.2f}-{:.2f}".format(
-                    A1FieldDistillCfg.sensor.forward_camera.latency_range[0],
-                    A1FieldDistillCfg.sensor.forward_camera.latency_range[1],
-                ),
-                "_pDelay{:.2f}-{:.2f}".format(
-                    A1FieldDistillCfg.sensor.proprioception.latency_range[0],
-                    A1FieldDistillCfg.sensor.proprioception.latency_range[1],
-                ),
-                ("_randOrder" if A1FieldDistillCfg.terrain.BarrierTrack_kwargs["randomize_obstacle_order"] else ""),
-                ("_noPerlinRate{:.1f}".format(
-                    (A1FieldDistillCfg.terrain.BarrierTrack_kwargs["no_perlin_threshold"] - A1FieldDistillCfg.terrain.TerrainPerlin_kwargs["zScale"][0]) / \
-                    (A1FieldDistillCfg.terrain.TerrainPerlin_kwargs["zScale"][1] - A1FieldDistillCfg.terrain.TerrainPerlin_kwargs["zScale"][0])
-                )),
-            ])
-            dataset_loops = -1 # negative value for infinite dataset loops
+        # pretrain_iterations = -1 # negative value for infinite training
+        # class pretrain_dataset:
+        #     scan_dir = "".join([
+        #         "logs/distill_a1_dagger/", datetime.now().strftime('%b%d_%H-%M-%S'), "_",
+        #         "".join(A1FieldDistillCfg.terrain.BarrierTrack_kwargs["options"]),
+        #         "_vDelay{:.2f}-{:.2f}".format(
+        #             A1FieldDistillCfg.sensor.forward_camera.latency_range[0],
+        #             A1FieldDistillCfg.sensor.forward_camera.latency_range[1],
+        #         ),
+        #         "_pDelay{:.2f}-{:.2f}".format(
+        #             A1FieldDistillCfg.sensor.proprioception.latency_range[0],
+        #             A1FieldDistillCfg.sensor.proprioception.latency_range[1],
+        #         ),
+        #         ("_randOrder" if A1FieldDistillCfg.terrain.BarrierTrack_kwargs["randomize_obstacle_order"] else ""),
+        #         ("_noPerlinRate{:.1f}".format(
+        #             (A1FieldDistillCfg.terrain.BarrierTrack_kwargs["no_perlin_threshold"] - A1FieldDistillCfg.terrain.TerrainPerlin_kwargs["zScale"][0]) / \
+        #             (A1FieldDistillCfg.terrain.TerrainPerlin_kwargs["zScale"][1] - A1FieldDistillCfg.terrain.TerrainPerlin_kwargs["zScale"][0])
+        #         )),
+        #     ])
+        #     dataset_loops = -1 # negative value for infinite dataset loops
             
-            random_shuffle_traj_order = True
-            keep_latest_ratio = 1.0
-            keep_latest_n_trajs = 2000
-            starting_frame_range = [0, 100]
+        #     random_shuffle_traj_order = True
+        #     keep_latest_ratio = 1.0
+        #     keep_latest_n_trajs = 2000
+        #     starting_frame_range = [0, 100]
 
         resume = False
         load_run = None
